@@ -1,7 +1,24 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <ESP_Mail_Client.h>
+
+#define WIFI_SSID ""
+#define WIFI_PASSWORD ""
+
+#define SMTP_HOST "smtp.gmail.com"
+#define SMTP_PORT 587
+
+#define SENDER_EMAIL ""
+#define SENDER_PASSWORD ""
+
+#define RECIPIENT_EMAIL ""
+
+SMTPSession smtp;
 
 TaskHandle_t emailTaskHandle = NULL;
 int moistureData[24];
+
+
 
 /*
 Takes hourly readings from a capacitive soil moisture sensor.
@@ -28,7 +45,16 @@ void readSensorData(void * parameters){
 }
 
 /*
-Send email with information about soil moisture.
+Sends email with information about soil moisture.
+
+What is SMTP? Simple Mail Transfer Protocol
+Process for delivering emails to a mail server from an email client
+
+1) TCP connection between client and server
+2) Client sends "Hello" command (HELO)
+3) Client sends multiple commands with email content
+4) Client alerts server when data transmission is complete, and server closes connection
+
 */
 void sendStatusEmail(void * parameters){
   for(;;){
@@ -47,6 +73,17 @@ void sendStatusEmail(void * parameters){
 void setup() {
 
   Serial.begin(115200);
+
+  //connect to Wi-Fi
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to Wi-Fi");
+  while(WiFi.status() != WL_CONNECTED){
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println();
+  Serial.println("Connection successful!");
+
 
   xTaskCreate(
     readSensorData,
