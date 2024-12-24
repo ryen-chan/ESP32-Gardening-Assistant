@@ -1,18 +1,27 @@
 #include <Arduino.h>
 
 TaskHandle_t emailTaskHandle = NULL;
+int moistureData[24];
 
 /*
-Takes hourly/daily readings from a capacitive soil moisture sensor.
-Notifies email task (and watering task if below moisture threshold).
+Takes hourly readings from a capacitive soil moisture sensor.
+Notifies watering task if below moisture threshold.
+Notifies email task every 24 hours.
 */
 void readSensorData(void * parameters){
   for(;;){
 
-    Serial.println("Reading Soil Moisture Data...");
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //read sensor data every hour for 24 hours
+    for(int i = 0; i < 24; i++){
 
-    Serial.println("Notify Email Task");
+      Serial.println("Reading Soil Moisture Data...");
+
+      vTaskDelay(60 * 1000 / portTICK_PERIOD_MS); //delay for a minute
+
+    }
+    
+    //notify email task
+    Serial.println("Notifying Email Task...");
     xTaskNotifyGive(emailTaskHandle);
 
   }
@@ -25,8 +34,13 @@ void sendStatusEmail(void * parameters){
   for(;;){
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY); //block indefinitely until notified
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
     Serial.println("Hello from Email Task");
     
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
   }
 }
 
