@@ -14,37 +14,47 @@
 #define RECIPIENT_EMAIL ""
 
 SMTPSession smtp;
+Session_Config config;
+SMTP_Message message;
 
+TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t emailTaskHandle = NULL;
 int moistureData[24];
 
 
-
 /*
+
 Takes hourly readings from a capacitive soil moisture sensor.
 Notifies watering task if below moisture threshold.
 Notifies email task every 24 hours.
+
 */
 void readSensorData(void * parameters){
   for(;;){
 
+    /*
     //read sensor data every hour for 24 hours
     for(int i = 0; i < 24; i++){
 
       Serial.println("Reading Soil Moisture Data...");
 
-      vTaskDelay(60 * 1000 / portTICK_PERIOD_MS); //delay for a minute
+      moistureData[i] = 8;
+
+      vTaskDelay(5 * 1000 / portTICK_PERIOD_MS); //delay for a minute
 
     }
-    
-    //notify email task
+    */
+
     Serial.println("Notifying Email Task...");
-    xTaskNotifyGive(emailTaskHandle);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    xTaskNotifyGive(emailTaskHandle); //notify email task
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY); //block indefinitely until email task done
 
   }
 }
 
 /*
+
 Sends email with information about soil moisture.
 
 What is SMTP? Simple Mail Transfer Protocol
@@ -63,9 +73,39 @@ void sendStatusEmail(void * parameters){
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-    Serial.println("Hello from Email Task");
-    
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    Serial.println("Hello from Email Task!");
+    /*
+    //set message content
+    String dataStr = "";
+    for(int i = 0; i < 23; i++){ //get sensor data from the past 24 hours
+      dataStr += moistureData[i] + ", ";
+    }
+    dataStr += moistureData[23];
+
+    String htmlMsg = "<h1>Soil Moisture Readings</h1>"; //generate HTML message
+    htmlMsg += "<p>";
+    htmlMsg += dataStr;
+    htmlMsg += "</p>";
+
+    message.html.content = htmlMsg.c_str();
+    */
+    message.text.content = "Testing";
+
+    //connect to server
+    Serial.println("Connecting to server...");
+    if(!smtp.connect(&config)){
+      Serial.println("Failed to connect");
+    }
+
+    //send email and close session
+    Serial.println("Sending email...");
+    if(!MailClient.sendMail(&smtp, &message)){
+      Serial.println("Failed to send email");
+    }
+
+    vTaskDelay(15*1000 / portTICK_PERIOD_MS);
+
+    xTaskNotifyGive(sensorTaskHandle); //notify sensor task when done
 
   }
 }
@@ -84,22 +124,37 @@ void setup() {
   Serial.println();
   Serial.println("Connection successful!");
 
+  //configure session
+  config.server.host_name = SMTP_HOST;
+  config.server.port = SMTP_PORT;
+
+  config.login.email = SENDER_EMAIL;
+  config.login.password = SENDER_PASSWORD;
+  config.login.user_domain = "";
+
+  //set message headers
+  message.sender.name = "Gardening Assistant";
+  message.sender.email = SENDER_EMAIL;
+  message.subject = "Soil Moisture Readings";
+  message.addRecipient("Ryan", RECIPIENT_EMAIL);
+
+  smtp.debug(1);
 
   xTaskCreate(
     readSensorData,
     "SensorTask",
     1000,
     NULL,
-    1,
-    NULL
+    2,
+    &sensorTaskHandle
   );
 
   xTaskCreate(
     sendStatusEmail,
     "EmailTask",
-    1000,
+    5000,
     NULL,
-    2,
+    1,
     &emailTaskHandle
   );
 
