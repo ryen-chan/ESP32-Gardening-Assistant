@@ -74,22 +74,23 @@ void sendStatusEmail(void * parameters){
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     Serial.println("Hello from Email Task!");
-    /*
+    
     //set message content
     String dataStr = "";
     for(int i = 0; i < 23; i++){ //get sensor data from the past 24 hours
-      dataStr += moistureData[i] + ", ";
+      dataStr += String(moistureData[i]);
+      dataStr += " => ";
     }
     dataStr += moistureData[23];
 
-    String htmlMsg = "<h1>Soil Moisture Readings</h1>"; //generate HTML message
-    htmlMsg += "<p>";
+    String htmlMsg = "<h1>Soil Moisture Data</h1>"; //generate HTML message
+    htmlMsg += "<p>Hourly readings for the past day:<br>";
     htmlMsg += dataStr;
     htmlMsg += "</p>";
 
     message.html.content = htmlMsg.c_str();
-    */
-    message.text.content = "Testing";
+    
+    //message.text.content = "Testing";
 
     //connect to server
     Serial.println("Connecting to server...");
@@ -135,7 +136,7 @@ void setup() {
   //set message headers
   message.sender.name = "Gardening Assistant";
   message.sender.email = SENDER_EMAIL;
-  message.subject = "Soil Moisture Readings";
+  message.subject = "Daily Gardening Report";
   message.addRecipient("Ryan", RECIPIENT_EMAIL);
 
   smtp.debug(1);
