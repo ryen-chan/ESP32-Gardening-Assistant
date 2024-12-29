@@ -13,13 +13,16 @@
 
 #define RECIPIENT_EMAIL ""
 
+#define SOIL_MOISTURE_PIN 35
+
 SMTPSession smtp;
 Session_Config config;
 SMTP_Message message;
 
+int moistureData[24];
+
 TaskHandle_t sensorTaskHandle = NULL;
 TaskHandle_t emailTaskHandle = NULL;
-int moistureData[24];
 
 
 /*
@@ -32,19 +35,17 @@ Notifies email task every 24 hours.
 void readSensorData(void * parameters){
   for(;;){
 
-    /*
     //read sensor data every hour for 24 hours
     for(int i = 0; i < 24; i++){
 
       Serial.println("Reading Soil Moisture Data...");
 
-      moistureData[i] = 8;
+      moistureData[i] = analogRead(SOIL_MOISTURE_PIN);
 
-      vTaskDelay(5 * 1000 / portTICK_PERIOD_MS); //delay for a minute
+      vTaskDelay(5 * 1000 / portTICK_PERIOD_MS); //delay for five seconds
 
     }
-    */
-
+    
     Serial.println("Notifying Email Task...");
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     xTaskNotifyGive(emailTaskHandle); //notify email task
@@ -114,6 +115,9 @@ void sendStatusEmail(void * parameters){
 void setup() {
 
   Serial.begin(115200);
+
+  //set pin modes
+  pinMode(SOIL_MOISTURE_PIN, INPUT);
 
   //connect to Wi-Fi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
