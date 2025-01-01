@@ -14,21 +14,28 @@
 #define RECIPIENT_EMAIL ""
 
 #define SOIL_MOISTURE_PIN 35
+#define RELAY_PIN 16
+
+//based on testing, moisture values vary greatly depending on sensor insertion depth and soil compactness
+//ideal moisture conditions (inserting such that "or" remains visible) -> [1700-2000]
+//after watering -> [<1575]
+#define MOISTURE_THRESHOLD 1600 //smaller the value, higher the moisture
 
 SMTPSession smtp;
 Session_Config config;
 SMTP_Message message;
 
+int hour;
 int moistureData[24];
 
 TaskHandle_t sensorTaskHandle = NULL;
+TaskHandle_t wateringTaskHandle = NULL;
 TaskHandle_t emailTaskHandle = NULL;
-
 
 /*
 
 Takes hourly readings from a capacitive soil moisture sensor.
-Notifies watering task if below moisture threshold.
+Notifies watering task every hour.
 Notifies email task every 24 hours.
 
 */
@@ -36,20 +43,57 @@ void readSensorData(void * parameters){
   for(;;){
 
     //read sensor data every hour for 24 hours
-    for(int i = 0; i < 24; i++){
+    for(hour = 0; hour < 24; hour++){
 
       Serial.println("Reading Soil Moisture Data...");
+      moistureData[hour] = analogRead(SOIL_MOISTURE_PIN);
 
-      moistureData[i] = analogRead(SOIL_MOISTURE_PIN);
+      Serial.println("Notifying Watering Task...");
+      xTaskNotifyGive(wateringTaskHandle); //notify watering task
+      ulTaskNotifyTake(pdTRUE, portMAX_DELAY); //block indefinitely until watering task done
 
-      vTaskDelay(5 * 1000 / portTICK_PERIOD_MS); //delay for five seconds
+      vTaskDelay(60 * 60 * 1000 / portTICK_PERIOD_MS); //delay for an hour
 
     }
     
     Serial.println("Notifying Email Task...");
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
     xTaskNotifyGive(emailTaskHandle); //notify email task
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY); //block indefinitely until email task done
+
+  }
+}
+
+/*
+
+Regulates moisture based on latest reading.
+If too wet (moisture value below threshold), turn off timed watering system.
+Otherwise, turn watering system on.
+
+*/
+void regulateMoisture(void * parameters){
+  for(;;){
+
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY); //block indefinitely until notified
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    Serial.println("Hello from Watering Task!");
+
+    Serial.println(moistureData[hour]);
+
+    //closed -> watering OFF, open -> watering ON
+    //relay module -> normally open
+    if(moistureData[hour] <= MOISTURE_THRESHOLD){ //if below threshold
+
+      //turn off watering system
+      digitalWrite(RELAY_PIN, HIGH);
+
+    }else{ //if above threshold
+
+      //turn on watering system
+      digitalWrite(RELAY_PIN, LOW);
+
+    }
+
+    xTaskNotifyGive(sensorTaskHandle); //notify sensor task when done
 
   }
 }
@@ -71,9 +115,7 @@ void sendStatusEmail(void * parameters){
   for(;;){
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY); //block indefinitely until notified
-
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-
     Serial.println("Hello from Email Task!");
     
     //set message content
@@ -118,6 +160,7 @@ void setup() {
 
   //set pin modes
   pinMode(SOIL_MOISTURE_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
 
   //connect to Wi-Fi
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -152,6 +195,15 @@ void setup() {
     NULL,
     2,
     &sensorTaskHandle
+  );
+
+  xTaskCreate(
+    regulateMoisture,
+    "WateringTask",
+    1000,
+    NULL,
+    1,
+    &wateringTaskHandle
   );
 
   xTaskCreate(
