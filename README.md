@@ -19,7 +19,6 @@ An ESP32-based system that monitors and regulates soil moisture to ensure proper
 
 * Soil moisture readings can vary depending on sensor insertion depth and soil compactness (had to standardize insertion method)
 
-
 ## Future Improvements
 
 * Plant Identification / Plant-Specific Soil Moisture Regulation
